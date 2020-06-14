@@ -1,3 +1,4 @@
+const path = require('path');
 const express = require('express');
 const xss = require('xss');
 const { v4: uuid } = require('uuid');
@@ -12,12 +13,12 @@ const serializeBookmark = bookmark => ({
     title: xss(bookmark.title),
     url: xss(bookmark.url),
     about: xss(bookmark.about),
-    rating: xss(bookmark.rating),
+    rating: bookmark.rating,
 });
 
 
 bookmarkRouter
-    .route('/bookmarks')
+    .route('/api/bookmarks')
     .get((req,res) => {
         const knexInstance = req.app.get('db');
         BookmarkService.getAllBookmarks(knexInstance)
@@ -42,14 +43,14 @@ bookmarkRouter
             .then(bookmark => {
                 res
                     .status(201)
-                    .location(`/bookmark/${bookmark.id}`)
+                    .location(path.posix.join(req.originalUrl, `/${bookmark.id}`))
                     .json(serializeBookmark(bookmark));
             })
             .catch(next);
     });
 
 bookmarkRouter
-    .route('/bookmark/:id')
+    .route('/api/bookmarks/:id')
     .all((req, res, next) => {
         BookmarkService.getById(
             req.app.get('db'),
@@ -83,10 +84,32 @@ bookmarkRouter
                 });
             });
     })
-    .delete((req, res, next) => {
+    .delete(jsonParser, (req, res, next) => {
+
         BookmarkService.deleteBookmark(req.app.get('db'), req.params.id)
             .then(() => {
                 res.status(204).end();
+            })
+            .catch(next);
+    })
+    .patch(jsonParser, (req, res, next) => {
+        const { title, url, about, rating } = req.body;
+        const bookmarkToUpdate = { title, url, about, rating };
+        const numberOfValues = Object.values(bookmarkToUpdate).filter(Boolean).length;
+        if (numberOfValues === 0) {
+            return res.status(400).json({
+                error: {
+                    message: 'Request body must contain either title, url, about, or rating'
+                }
+            });
+        }
+        BookmarkService.updateBookmark(
+            req.app.get('db'), 
+            req.params.id, 
+            bookmarkToUpdate
+        )
+            .then(numRowsAffected => {
+                res.status(204).end()
             })
             .catch(next);
     });

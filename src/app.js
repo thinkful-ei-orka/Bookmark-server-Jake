@@ -15,24 +15,24 @@ const morganOption = (NODE_ENV === 'production')
     : 'common';
 
 app.use(morgan(morganOption));
+app.use(express.json());
 app.use(helmet());
-// app.use(function validateBearerToken(req, res, next) {
-//     const apiToken = process.env.API_TOKEN;
-//     const authToken = req.get('Authorization');
-  
-//     if (!authToken || authToken.split(' ')[1] !== apiToken) {
-//         logger.error(`Unauthorized request to path: ${req.path}`);
-//         return res.status(401).json({ error: 'Unauthorized request' });
-//     }
-//     // move to the next middleware
-//     next();
-// });
+app.use(cors());
+app.use(function validateBearerToken(req, res, next) {
+    const apiToken = process.env.API_TOKEN;
+    const authToken = req.get('Authorization');
+    logger.error("Server token:  " + apiToken + "  "  + "Client token:  " + authToken);
+    if (!authToken || authToken.split(' ')[1] !== apiToken) {
+        logger.error(`Unauthorized request to path: ${req.path}`);
+        return res.status(401).json({ error: 'Unauthorized request' });
+    }
+    // move to the next middleware
+    next();
+});
 
 app.use(bookmarkRouter);
-app.use(express.json());
-app.get('/', (req, res) => {
-    res.send('Hello, boilerplate!');
-});
+
+
 
 app.get('/xss', (req, res) => {
     res.cookie('secretToken', '1234567890');
@@ -42,13 +42,14 @@ app.get('/xss', (req, res) => {
 app.use(function errorHandler(error, req, res, next) {
     let response;
     if (NODE_ENV === 'production') {
+        console.error(error);
         response = { error: { message: 'server error' } };
     } else {
-        console.error(error);
+        
         response = { message: error.message, error };
     }
     res.status(500).json(response);
 });
-app.use(cors());
+
 
 module.exports = app;
